@@ -1,0 +1,52 @@
+{
+    "name": "goletter/hyperf-amqp",
+    "description": "Hyperf 分片 AMQP：串行键分片、重试、死信与运维命令。",
+    "type": "library",
+    "version": "1.0.0",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "goletter",
+            "email": "goletter@outlook.com"
+        }
+    ],
+    "keywords": [
+        "php",
+        "hyperf",
+        "amqp",
+        "rabbitmq",
+        "sharded",
+        "dlq",
+        "goletter"
+    ],
+    "require": {
+        "php": ">=8.1",
+        "hyperf/amqp": "~3.1.0",
+        "hyperf/command": "~3.1.0",
+        "hyperf/context": "~3.1.0",
+        "hyperf/contract": "~3.1.0",
+        "hyperf/coroutine": "~3.1.0",
+        "hyperf/process": "~3.1.0",
+        "psr/container": "^1.0 || ^2.0"
+    },
+    "suggest": {
+        "goletter/hyperf-utils": "提供 logging() 时 AmqpLogger 会优先使用。",
+        "hyperf/framework": "在 Hyperf 中使用 ConfigProvider / DI 时需要。",
+        "hyperf/logger": "无 logging() 时回落到 LoggerFactory。"
+    },
+    "autoload": {
+        "psr-4": {
+            "Goletter\\Amqp\\": "src/"
+        }
+    },
+    "extra": {
+        "hyperf": {
+            "config": "Goletter\\Amqp\\ConfigProvider"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true
+    }
+}
