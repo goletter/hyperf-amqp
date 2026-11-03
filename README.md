@@ -78,28 +78,30 @@ Goletter\Amqp\Contract\QueueRegistryInterface::class => App\Amqp\Queue\AccountQu
 
 ### 2. 消费进程
 
+包内已提供通用进程，在 `config/autoload/processes.php` 注册即可：
+
+```php
+return [
+    Goletter\Amqp\Process\ShardedQueueConsumeProcess::class,
+];
+```
+
+它会消费 `QueueRegistryInterface` 里注册的全部队列。需要自定义进程名 / 数量时可继承并覆盖：
+
 ```php
 namespace App\Process;
 
-use Goletter\Amqp\Contract\QueueRegistryInterface;
-use Goletter\Amqp\Sharded\ShardedConsumeProcess;
+use Goletter\Amqp\Process\ShardedQueueConsumeProcess;
 
-class AccountShardedConsumeProcess extends ShardedConsumeProcess
+class AccountShardedConsumeProcess extends ShardedQueueConsumeProcess
 {
     public string $name = 'account-sharded-consume';
 
     public int $nums = 1;
-
-    protected function queues(): array
-    {
-        return $this->container->get(QueueRegistryInterface::class)->classes();
-    }
 }
 ```
 
-在 `config/autoload/processes.php` 注册该类。
-
-> **不要**再加 `#[Process]`，也不要给 Consumer 加 `#[Consumer]`：分片消费者由 `ShardedConsumeProcess` 按分片拉起，注解会导致双重消费。
+> **不要**再加 `#[Process]`，也不要给 Consumer 加 `#[Consumer]`：分片消费者由进程按分片拉起，注解会导致双重消费。
 
 ### 3. 生成业务队列
 
