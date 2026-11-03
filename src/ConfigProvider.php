@@ -7,6 +7,7 @@ namespace Goletter\Amqp;
 use Goletter\Amqp\Command\AmqpDlqInfoCommand;
 use Goletter\Amqp\Command\AmqpDlqPurgeCommand;
 use Goletter\Amqp\Command\AmqpDlqReplayCommand;
+use Goletter\Amqp\Command\AmqpInfoCommand;
 use Goletter\Amqp\Command\AmqpMakeQueueCommand;
 use Goletter\Amqp\Command\AmqpPurgeCommand;
 use Goletter\Amqp\Command\AmqpResetShardsCommand;
@@ -19,6 +20,7 @@ class ConfigProvider
             'dependencies' => [
             ],
             'commands' => [
+                AmqpInfoCommand::class,
                 AmqpDlqInfoCommand::class,
                 AmqpDlqPurgeCommand::class,
                 AmqpDlqReplayCommand::class,

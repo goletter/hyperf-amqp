@@ -13,7 +13,7 @@ declare(strict_types=1);
  * 本文件只规定脚手架「生成到哪、注册表写哪个文件」。
  * 执行 php bin/hyperf.php amqp:make-queue accountRefund 时：
  * - 按下方 namespace / path 生成 Queue、Producer、Consumer 三件套
- * - 在 registry_file 的 all() 中追加 'accountRefund' => AccountRefundQueue::class
+ * - 在 registry_file 的 queues()/all() 中追加 'accountRefund' => AccountRefundQueue::class
  *
  * 若项目目录结构变化，只改本配置即可，无需改包代码。
  */

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Goletter\Amqp\Command;
 
-use Hyperf\Command\Annotation\Command;
 use Hyperf\Command\Command as HyperfCommand;
 use Hyperf\Context\ApplicationContext;
 use Hyperf\Contract\ConfigInterface;
@@ -17,9 +16,9 @@ use Symfony\Component\Console\Input\InputOption;
  *   php bin/hyperf.php amqp:make-queue accountRefund
  *   php bin/hyperf.php amqp:make-queue accountRefund --label=账户退款
  *   php bin/hyperf.php amqp:make-queue accountRefund --serial=tenant_id,account_id
+ *   php bin/hyperf.php amqp:make-queue accountRefund --shards=32 --max-attempts=1 --no-dlq
  *   php bin/hyperf.php amqp:make-queue accountRefund --force
  */
-#[Command]
 class AmqpMakeQueueCommand extends HyperfCommand
 {
     public function __construct()
@@ -34,6 +33,9 @@ class AmqpMakeQueueCommand extends HyperfCommand
         $this->addArgument('name', InputArgument::REQUIRED, '业务名，如 accountRefund / AccountRefund');
         $this->addOption('label', null, InputOption::VALUE_REQUIRED, '中文说明（注释与日志用）');
         $this->addOption('serial', null, InputOption::VALUE_REQUIRED, '串行字段，逗号分隔，默认 tenant_id,busine_id');
+        $this->addOption('shards', null, InputOption::VALUE_REQUIRED, '分片数，默认不生成（用基类 16）');
+        $this->addOption('max-attempts', null, InputOption::VALUE_REQUIRED, '最大执行次数（含首次），默认不生成（用基类 3）');
+        $this->addOption('no-dlq', null, InputOption::VALUE_NONE, '生成 useDeadLetter(): false');
         $this->addOption('force', 'f', InputOption::VALUE_NONE, '已存在时覆盖');
         $this->addOption('no-register', null, InputOption::VALUE_NONE, '不写入队列注册表');
     }
@@ -57,13 +59,30 @@ class AmqpMakeQueueCommand extends HyperfCommand
             return;
         }
 
+        $shardsOpt = $this->input->getOption('shards');
+        $shards = $shardsOpt !== null && $shardsOpt !== '' ? max(1, (int) $shardsOpt) : null;
+        $maxAttemptsOpt = $this->input->getOption('max-attempts');
+        $maxAttempts = $maxAttemptsOpt !== null && $maxAttemptsOpt !== '' ? max(1, (int) $maxAttemptsOpt) : null;
+        $noDlq = (bool) $this->input->getOption('no-dlq');
+
         $queueClass = $studly . 'Queue';
         $producerClass = $studly . 'Producer';
         $consumerClass = $studly . 'Consumer';
         $paths = $this->generatePaths();
 
         $files = [
-            $paths['queue_path'] . '/' . $queueClass . '.php' => $this->queueStub($queueClass, $producerClass, $consumerClass, $exchange, $label, $serialFields, $paths),
+            $paths['queue_path'] . '/' . $queueClass . '.php' => $this->queueStub(
+                $queueClass,
+                $producerClass,
+                $consumerClass,
+                $exchange,
+                $label,
+                $serialFields,
+                $paths,
+                $shards,
+                $maxAttempts,
+                $noDlq
+            ),
             $paths['producer_path'] . '/' . $producerClass . '.php' => $this->producerStub($queueClass, $producerClass, $paths),
             $paths['consumer_path'] . '/' . $consumerClass . '.php' => $this->consumerStub($queueClass, $consumerClass, $label, $paths),
         ];
@@ -93,7 +112,8 @@ class AmqpMakeQueueCommand extends HyperfCommand
 
         $this->info('完成。重启消费进程后会自动拉起该队列。');
         $this->line(sprintf('发送：\\%s\\%s::produce($data);', $paths['queue_namespace'], $queueClass));
-        $this->line(sprintf('运维：php bin/hyperf.php amqp:dlq-info %s', $exchange));
+        $this->line(sprintf('积压：php bin/hyperf.php amqp:info %s', $exchange));
+        $this->line(sprintf('死信：php bin/hyperf.php amqp:dlq-info %s', $exchange));
     }
 
     /**
@@ -172,7 +192,7 @@ class AmqpMakeQueueCommand extends HyperfCommand
             return false;
         }
 
-        // 与 Queue 同命名空间，只需往 all() 数组加一行
+        // 与 Queue 同命名空间，往 queues()/all() 返回数组加一行
         $entry = "            '{$exchange}' => {$queueClass}::class,\n";
         $updated = preg_replace(
             '#(return\s*\[\n)#',
@@ -227,23 +247,59 @@ class AmqpMakeQueueCommand extends HyperfCommand
         string $exchange,
         string $label,
         array $serialFields,
-        array $paths
+        array $paths,
+        ?int $shards = null,
+        ?int $maxAttempts = null,
+        bool $noDlq = false
     ): string {
         $serialLabel = implode(' + ', $serialFields);
-        $serialMethod = '';
+        $extraMethods = '';
         $isDefault = $serialFields === ['tenant_id', 'busine_id'];
         if (! $isDefault) {
             $export = implode(",\n            ", array_map(
                 static fn (string $f) => "'" . addslashes($f) . "'",
                 $serialFields
             ));
-            $serialMethod = <<<PHP
+            $extraMethods .= <<<PHP
 
     public static function serialFields(): array
     {
         return [
             {$export},
         ];
+    }
+
+PHP;
+        }
+
+        if ($shards !== null) {
+            $extraMethods .= <<<PHP
+
+    public static function shards(): int
+    {
+        return {$shards};
+    }
+
+PHP;
+        }
+
+        if ($maxAttempts !== null) {
+            $extraMethods .= <<<PHP
+
+    public static function maxAttempts(): int
+    {
+        return {$maxAttempts};
+    }
+
+PHP;
+        }
+
+        if ($noDlq) {
+            $extraMethods .= <<<PHP
+
+    public static function useDeadLetter(): bool
+    {
+        return false;
     }
 
 PHP;
@@ -268,7 +324,7 @@ use Goletter\\Amqp\\Sharded\\TenantBusinessShardedQueue;
 final class {$queueClass} extends TenantBusinessShardedQueue
 {
     public const EXCHANGE = '{$exchange}';
-{$serialMethod}
+{$extraMethods}
     public static function consumerClass(): string
     {
         return {$consumerClass}::class;

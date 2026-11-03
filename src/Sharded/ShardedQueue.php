@@ -6,7 +6,6 @@ namespace Goletter\Amqp\Sharded;
 
 use Hyperf\Amqp\ConnectionFactory;
 use Hyperf\Amqp\Consumer;
-use Hyperf\Amqp\Producer;
 use Hyperf\Context\ApplicationContext;
 use InvalidArgumentException;
 use PhpAmqpLib\Wire\AMQPTable;
@@ -171,7 +170,7 @@ abstract class ShardedQueue
             $data['produced_at'] = (int) round(microtime(true) * 1000);
         }
 
-        return ApplicationContext::getContainer()->get(Producer::class)->produce(new $producerClass($data));
+        return produce(new $producerClass($data));
     }
 
     /**

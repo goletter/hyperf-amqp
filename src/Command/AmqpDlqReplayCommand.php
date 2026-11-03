@@ -8,7 +8,6 @@ use Goletter\Amqp\Sharded\ShardedProducer;
 use Goletter\Amqp\Sharded\ShardedQueue;
 use Hyperf\Amqp\ConnectionFactory;
 use Hyperf\Amqp\Packer\Packer;
-use Hyperf\Command\Annotation\Command;
 use Hyperf\Command\Command as HyperfCommand;
 use PhpAmqpLib\Message\AMQPMessage;
 use Symfony\Component\Console\Input\InputArgument;
@@ -24,7 +23,6 @@ use Hyperf\Context\ApplicationContext;
  *   php bin/hyperf.php amqp:dlq-replay accountRecharge --where=account_id:5 --scan=200
  *   php bin/hyperf.php amqp:dlq-replay accountRecharge --where=tenant_id:1 --where=account_id:5
  */
-#[Command]
 class AmqpDlqReplayCommand extends HyperfCommand
 {
     use ResolvesShardedQueues;

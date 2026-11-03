@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Goletter\Amqp\Command;
 
 use Hyperf\Amqp\ConnectionFactory;
-use Hyperf\Command\Annotation\Command;
 use Hyperf\Command\Command as HyperfCommand;
 use PhpAmqpLib\Channel\AMQPChannel;
 use Symfony\Component\Console\Input\InputArgument;
@@ -23,7 +22,6 @@ use Hyperf\Context\ApplicationContext;
  *   php bin/hyperf.php amqp:reset-shards accountRecharge --force
  *   php bin/hyperf.php amqp:reset-shards --all --force
  */
-#[Command]
 class AmqpResetShardsCommand extends HyperfCommand
 {
     use ResolvesShardedQueues;

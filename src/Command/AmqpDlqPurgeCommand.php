@@ -6,7 +6,6 @@ namespace Goletter\Amqp\Command;
 
 use Goletter\Amqp\Support\AmqpLogger;
 use Hyperf\Amqp\ConnectionFactory;
-use Hyperf\Command\Annotation\Command;
 use Hyperf\Command\Command as HyperfCommand;
 use Hyperf\Context\ApplicationContext;
 use Symfony\Component\Console\Input\InputArgument;
@@ -19,7 +18,6 @@ use Throwable;
  *   php bin/hyperf.php amqp:dlq-purge accountRecharge --force
  *   php bin/hyperf.php amqp:dlq-purge --all --force
  */
-#[Command]
 class AmqpDlqPurgeCommand extends HyperfCommand
 {
     use ResolvesShardedQueues;

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Goletter\Amqp\Command;
 
 use Hyperf\Amqp\ConnectionFactory;
-use Hyperf\Command\Annotation\Command;
 use Hyperf\Command\Command as HyperfCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
@@ -21,7 +20,6 @@ use Goletter\Amqp\Support\AmqpLogger;
  *   php bin/hyperf.php amqp:dlq-info accountRecharge
  *   php bin/hyperf.php amqp:dlq-info --all
  */
-#[Command]
 class AmqpDlqInfoCommand extends HyperfCommand
 {
     use ResolvesShardedQueues;
