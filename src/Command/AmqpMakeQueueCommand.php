@@ -194,13 +194,25 @@ class AmqpMakeQueueCommand extends HyperfCommand
 
         // 与 Queue 同命名空间，往 queues()/all() 返回数组加一行
         $entry = "            '{$exchange}' => {$queueClass}::class,\n";
+
+        // 空注册表常为单行 return [];，需先展开再写入
         $updated = preg_replace(
-            '#(return\s*\[\n)#',
-            '$1' . $entry,
+            '#return\s*\[\s*\];#',
+            "return [\n{$entry}        ];",
             $code,
             1,
             $count
         );
+
+        if (! $count) {
+            $updated = preg_replace(
+                '#(return\s*\[\r?\n)#',
+                '$1' . $entry,
+                $code,
+                1,
+                $count
+            );
+        }
 
         if (! $count || $updated === null) {
             $this->error('无法自动写入 Registry，请手动添加：' . trim($entry));
