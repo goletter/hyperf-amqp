@@ -32,6 +32,6 @@ return [
         /** Consumer 文件落盘目录 */
         'consumer_path' => BASE_PATH . '/app/Amqp/Consumer',
         /** 生成后往哪个注册表文件追加一行（通常即 QueueRegistry 实现类） */
-        'registry_file' => BASE_PATH . '/app/Amqp/Queue/AccountQueueRegistry.php',
+        'registry_file' => BASE_PATH . '/app/Amqp/Queue/QueueRegistry.php',
     ],
 ];
