@@ -186,6 +186,8 @@ class AccountRechargeConsumer extends ShardedConsumer
 | `serialFields()` | 串行键字段 | `tenant_id,busine_id` |
 | `serialFieldAliases()` | 字段别名 | `busine_id` ← `business_id` |
 | `shards()` | 分片数 | `16` |
+| `prefetchCount()` | 每分片 QoS prefetch | `32` |
+| `logConsumeTiming()` | 是否打每条 consume_timing | `true` |
 | `maxAttempts()` | 含首次的最大执行次数 | `3` |
 | `useDeadLetter()` | 是否挂 DLX/DLQ | `true` |
 | `intervalMs()` | ACK 前额外等待（同片限速） | `0` |
@@ -281,8 +283,24 @@ php bin/hyperf.php amqp:reset-shards accountRecharge --force --purge-dlq
 
 ## 设计要点
 
-- 同一 `serialKey` → 同一分片；片内 `prefetch=1` + `x-single-active-consumer` 串行
+- 同一 `serialKey` → 同一分片；片内 `x-single-active-consumer` + 单协程顺序 `handle` 串行
+- 默认 `prefetchCount=32`（可覆盖）；Consumer 若开并发 handle，请改回 `1`
 - 队列类型为 **quorum**
 - 不同 key 尽量打散到不同分片并行
 - 失败：`attempts` 计数重投；超过 `maxAttempts` → `DROP`（有 DLX 则进死信）
 - `amqp:dlq-replay` 重投时会重置 `attempts`
+- 进程内缓存 `declareShard` / `declareDeadLetter`，避免每次 `produce` 都打 RabbitMQ 声明
+
+## 吞吐调优
+
+投递慢的主因通常是：**每条消息都 `queue_declare` / `exchange_declare`**（已用进程内缓存消除）。
+
+消费慢多为设计取舍 + 配置：
+
+1. **同 key 必须串行**：单分片吞吐 ≈ `1 / handle_ms`；不同 key 靠分片并行  
+2. **加大 `shards()`**（如 32/64），让不同串行键更分散  
+3. **`prefetchCount()`**：默认 32，减少 broker↔consumer RTT；严格保守可改 `1`  
+4. **关掉高频 timing 日志**：`logConsumeTiming(): false`  
+5. **`intervalMs()` / `retryDelayMs()`**：大于 0 会占住该分片；生产环境尽量保持默认  
+6. **业务 `handle()`**：才是消费上限；短逻辑、复用连接/ClientFactory  
+7. **进程数**：`ShardedQueueConsumeProcess::$nums` 可多进程，但同一分片仍只有一个活跃消费者

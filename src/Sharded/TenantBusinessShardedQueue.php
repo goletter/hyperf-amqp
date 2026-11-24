@@ -85,7 +85,7 @@ abstract class TenantBusinessShardedQueue extends ShardedQueue
     }
 
     /**
-     * 生产默认无额外间隔；串行仍由 prefetch=1 保证。
+     * 生产默认无额外间隔；同片串行由单活跃消费者 + 顺序 handle 保证。
      * 若要对同组限速，子类可覆盖为 >0。
      */
     public static function intervalMs(): int

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Goletter\Amqp\Command;
 
+use Goletter\Amqp\Sharded\ShardedQueue;
 use Hyperf\Amqp\ConnectionFactory;
 use Hyperf\Command\Command as HyperfCommand;
+use Hyperf\Context\ApplicationContext;
 use PhpAmqpLib\Channel\AMQPChannel;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Throwable;
-
-use Hyperf\Context\ApplicationContext;
 
 /**
  * 删除旧分片队列以便按新参数（含 DLX）重建。
@@ -79,6 +79,7 @@ class AmqpResetShardsCommand extends HyperfCommand
                     }
 
                     $connection->releaseChannel($channel);
+                    ShardedQueue::clearDeclareCache();
                     if ($queueClass::useDeadLetter()) {
                         $queueClass::declareDeadLetter();
                         $channel = $connection->getChannel();

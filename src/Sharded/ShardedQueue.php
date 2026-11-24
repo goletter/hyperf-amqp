@@ -18,6 +18,20 @@ use PhpAmqpLib\Wire\AMQPTable;
  */
 abstract class ShardedQueue
 {
+    /**
+     * 进程内已声明的分片队列（exchange.shard => true）。
+     *
+     * @var array<string, true>
+     */
+    private static array $declaredShards = [];
+
+    /**
+     * 进程内已声明的死信（exchange@pool => true）。
+     *
+     * @var array<string, true>
+     */
+    private static array $declaredDeadLetters = [];
+
     abstract public static function exchange(): string;
 
     /**
@@ -42,11 +56,28 @@ abstract class ShardedQueue
 
     /**
      * 同组分片内，本条 ACK 前等待的毫秒数（下一条才会被投递）。
-     * 0 = 无额外间隔（仍由 prefetch=1 保证同片串行）。
+     * 0 = 无额外间隔（仍由 prefetch 保证同片串行）。
      */
     public static function intervalMs(): int
     {
         return 0;
+    }
+
+    /**
+     * 每分片 QoS prefetch。默认 32：单消费者仍顺序处理，可减少 broker RTT。
+     * 若 Consumer 开启了并发 handle，请改回 1 以保证同片严格串行。
+     */
+    public static function prefetchCount(): int
+    {
+        return 32;
+    }
+
+    /**
+     * 是否记录每条消息的 consume_timing 日志。高频队列可关掉以减 IO。
+     */
+    public static function logConsumeTiming(): bool
+    {
+        return true;
     }
 
     /**
@@ -73,6 +104,15 @@ abstract class ShardedQueue
     public static function retryDelayMs(): int
     {
         return 2000;
+    }
+
+    /**
+     * 清空进程内声明缓存（例如 amqp:reset-shards 后同进程要重建时）。
+     */
+    public static function clearDeclareCache(): void
+    {
+        self::$declaredShards = [];
+        self::$declaredDeadLetters = [];
     }
 
     public static function dlxExchange(): string
@@ -118,6 +158,11 @@ abstract class ShardedQueue
             return;
         }
 
+        $cacheKey = static::exchange() . '@' . $pool;
+        if (isset(self::$declaredDeadLetters[$cacheKey])) {
+            return;
+        }
+
         $factory = ApplicationContext::getContainer()->get(ConnectionFactory::class);
         $connection = $factory->getConnection($pool);
         $channel = $connection->getChannel();
@@ -147,6 +192,7 @@ abstract class ShardedQueue
                 null
             );
             $channel->queue_bind(static::dlq(), static::dlxExchange(), static::dlqRoutingKey());
+            self::$declaredDeadLetters[$cacheKey] = true;
         } finally {
             $connection->releaseChannel($channel);
         }
@@ -180,6 +226,11 @@ abstract class ShardedQueue
      */
     public static function declareShard(int $shard): void
     {
+        $cacheKey = static::exchange() . '.' . $shard;
+        if (isset(self::$declaredShards[$cacheKey])) {
+            return;
+        }
+
         $consumerClass = static::consumerClass();
         if (! is_a($consumerClass, ShardedConsumer::class, true)) {
             throw new InvalidArgumentException($consumerClass . ' 必须继承 ' . ShardedConsumer::class);
@@ -197,6 +248,7 @@ abstract class ShardedQueue
         $channel = $connection->getChannel();
         try {
             $container->get(Consumer::class)->declare($message, $channel);
+            self::$declaredShards[$cacheKey] = true;
         } finally {
             $connection->releaseChannel($channel);
         }

@@ -25,7 +25,7 @@ use Throwable;
 use Goletter\Amqp\Support\AmqpLogger;
 
 /**
- * 分片消费者：quorum + 单活跃消费者 + prefetch=1。
+ * 分片消费者：quorum + 单活跃消费者；默认 prefetch 见 ShardedQueue::prefetchCount()。
  *
  * 子类实现 queueClass() 和 handle()。
  * 不要加 #[Consumer]，由 ShardedConsumeProcess 按分片拉起。
@@ -36,7 +36,7 @@ abstract class ShardedConsumer extends ConsumerMessage
 
     protected ?array $qos = [
         'prefetch_size' => 0,
-        'prefetch_count' => 1,
+        'prefetch_count' => 32,
         'global' => false,
     ];
 
@@ -50,6 +50,12 @@ abstract class ShardedConsumer extends ConsumerMessage
         $this->setExchange($queueClass::exchange());
         $this->setRoutingKey($queueClass::routingKey($this->shard));
         $this->setQueue($queueClass::queue($this->shard));
+        $prefetch = max(1, $queueClass::prefetchCount());
+        $this->qos = [
+            'prefetch_size' => 0,
+            'prefetch_count' => $prefetch,
+            'global' => false,
+        ];
     }
 
     public function getShard(): int
@@ -79,7 +85,7 @@ abstract class ShardedConsumer extends ConsumerMessage
 
         $this->logTiming($queueClass, $payload, $startedAt, $result->value ?? (string) $result);
 
-        // prefetch=1：ACK 前等待，同组分片下一条才会被投递
+        // intervalMs>0：ACK 前等待，用于同片限速
         $intervalMs = max(0, $queueClass::intervalMs());
         if ($intervalMs > 0 && $result === Result::ACK) {
             usleep($intervalMs * 1000);
@@ -95,6 +101,10 @@ abstract class ShardedConsumer extends ConsumerMessage
      */
     protected function logTiming(string $queueClass, array $payload, float $startedAt, string $result): void
     {
+        if (! $queueClass::logConsumeTiming()) {
+            return;
+        }
+
         $doneAt = microtime(true);
         $handleMs = (int) round(($doneAt - $startedAt) * 1000);
         $producedAt = (int) ($payload['produced_at'] ?? 0);
