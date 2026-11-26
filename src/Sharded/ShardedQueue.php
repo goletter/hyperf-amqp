@@ -95,7 +95,7 @@ abstract class ShardedQueue
      */
     public static function useDeadLetter(): bool
     {
-        return true;
+        return false;
     }
 
     /**
