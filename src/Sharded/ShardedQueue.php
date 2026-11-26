@@ -64,12 +64,12 @@ abstract class ShardedQueue
     }
 
     /**
-     * 每分片 QoS prefetch。默认 32：单消费者仍顺序处理，可减少 broker RTT。
+     * 每分片 QoS prefetch。默认 16：单消费者仍顺序处理，可减少 broker RTT。
      * 若 Consumer 开启了并发 handle，请改回 1 以保证同片严格串行。
      */
     public static function prefetchCount(): int
     {
-        return 32;
+        return 16;
     }
 
     /**

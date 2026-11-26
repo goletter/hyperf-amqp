@@ -36,7 +36,7 @@ abstract class ShardedConsumer extends ConsumerMessage
 
     protected ?array $qos = [
         'prefetch_size' => 0,
-        'prefetch_count' => 32,
+        'prefetch_count' => 16,
         'global' => false,
     ];
 
